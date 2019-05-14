@@ -3,10 +3,16 @@ title: "R SCRAPING"
 output: html_document
 ---
 
+
+1、将标签做聚类分析
+2、将标签做主成分分析
+3、将标签做因子分析
+4、回归分析预测评分
+
 ```{r}
 library(rvest)
 library(tidyverse)
-# library(splitstackshape) #cSplit_e, 单列分隔符数据变为多列哑变量
+library(lubridate)
 ```
 
 #单页爬取测试
@@ -91,17 +97,65 @@ game_df_c %>%
 
 #合并数据
 game_df_c %>% inner_join(game_label, by = "id") %>% 
-  select(id, everything(), -label) -> game_df_c  #调整ID列位置
+  select(id, everything(), -label, -platform) -> game_df_c  #调整ID列位置
 game_df_c
+
+#保留完整样本
+game_df_c %>% 
+  na.omit() %>% 
+  filter(type != "" & lang != "") -> game_df_full
+game_df_full
 ```
 
-#标签出现比例
+#描述分析
 ```{r}
-game_df_c %>% 
-  select(-c(name, type, lang, score, date, platform, size_mb)) %>% 
+#标签出现数量
+game_df_full %>% 
+  select(-c(name, type, lang, score, date, size_mb)) %>% 
   gather(key = label, value = n, c(DC:`足球`)) %>% #宽数据转长数据
   group_by(label) %>% 
   summarise(sum = sum(n)) %>% 
   arrange(desc(sum))
+
+#类型与评分
+game_df_full %>% count(type) %>% arrange(desc(n))
+game_df_full %>% 
+  group_by(type) %>% 
+  summarise(mean_score = mean(score)) %>% 
+  arrange(desc(mean_score)) %>% filter(type != "")
+
+#语言与评分
+game_df_full %>% count(lang) %>% arrange(desc(n))
+game_df_full %>% 
+  group_by(lang) %>% 
+  summarise(mean_score = mean(score)) %>% 
+  arrange(desc(mean_score))
+
+#面积与评分
+game_df_full %>% select(size_mb) %>% summary()
+game_df_full %>% 
+  ggplot(aes(size_mb, score)) +
+  geom_point() +
+  scale_x_log10()
+
+#年份与评分
+game_df_full %>% 
+  mutate(year = year(date),
+         year_fz = case_when(year <= 2000 ~ "<=2000",
+                             year >= 2001 & year <= 2005 ~ "2001-2005",
+                             year >= 2006 & year <= 2010 ~ "2006-2010",
+                             year >= 2011 & year <= 2015 ~ "2011-2015",
+                             year >= 2016 ~ ">=2016")) %>% 
+  group_by(year_fz) %>% 
+  summarise(mean_score = mean(score)) %>% 
+  arrange(desc(mean_score))
+```
+
+#提取标签主成分
+```{r}
+game_df_full %>% 
+  select(DC:`足球`) %>% 
+  princomp() -> label_pca
+label_pca$sdev ^ 2
 ```
 
