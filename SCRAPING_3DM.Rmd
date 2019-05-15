@@ -59,8 +59,20 @@ for (i in 1:1843){
   game_content[seq(4, length(game_content), 6)] %>% as.numeric() -> score_data        #评分
   game_content[seq(5, length(game_content), 6)] %>% as.Date() -> date_data            #发布时间
   game_content[seq(6, length(game_content), 6)] -> platform_data                      #平台
-  game %>% html_nodes("ul li .a_click") %>% html_text(trim = TRUE) %>% str_extract("\\(.+\\)") %>%     str_replace_all("[\\(\\)]", "") -> size_data  #游戏大小
-  game %>% html_nodes("li .li2") %>% html_text(trim = TRUE) %>% str_replace_all("[标签：|\n]", "") %>% str_trim(side = "both") %>% str_replace_all("\\s+", ",") -> label_data  #标签
+  game %>% 
+    html_nodes("ul li .a_click") %>% 
+    html_text(trim = TRUE) %>% 
+    str_extract("\\(.+\\)") %>%     
+    str_replace_all("[\\(\\)]", "") -> size_data  #游戏大小
+  game %>% 
+    html_nodes("li .li2") %>% 
+    html_text(trim = TRUE) %>% 
+    str_replace_all("[标签：|\n]", "") %>% 
+    str_trim(side = "both") %>% 
+    str_replace_all("\\s+", ",") -> label_data  #标签
+  game %>% html_nodes("div .listwrap a img") %>% html_attr("src") -> img_link_data   #图片链接
+  game %>% html_nodes("div .bt a") %>% html_attr("href") -> content_link_data        #内容链接
+  
   game_df_i <- tibble(name = name_data, 
                       type = type_data,
                       hot = hot_data,
@@ -69,7 +81,9 @@ for (i in 1:1843){
                       date = date_data,
                       platform = platform_data,
                       size = size_data,
-                      label = label_data)
+                      label = label_data,
+                      img_link = img_link_data,
+                      content_link = content_link_data)
   game_df <- bind_rows(game_df, game_df_i)
 }
 game_df
@@ -141,21 +155,40 @@ game_df_full %>%
 #年份与评分
 game_df_full %>% 
   mutate(year = year(date),
-         year_fz = case_when(year <= 2000 ~ "<=2000",
-                             year >= 2001 & year <= 2005 ~ "2001-2005",
-                             year >= 2006 & year <= 2010 ~ "2006-2010",
-                             year >= 2011 & year <= 2015 ~ "2011-2015",
-                             year >= 2016 ~ ">=2016")) %>% 
-  group_by(year_fz) %>% 
+         time = 2020 - year) %>% 
+  group_by(time) %>% 
   summarise(mean_score = mean(score)) %>% 
-  arrange(desc(mean_score))
+  arrange(time) %>% 
+  ggplot(aes(time, mean_score)) +
+  geom_point() +
+  geom_line() +
+  scale_x_continuous(breaks = seq(1, 20, 1))
 ```
 
-#提取标签主成分
-```{r}
+#标签主成分：方法1
+```{r, fig.height=8, fig.width=15}
 game_df_full %>% 
   select(DC:`足球`) %>% 
-  princomp() -> label_pca
-label_pca$sdev ^ 2
+  princomp() -> label_pca1
+summary(label_pca1) #第一行标准差平方为解释了多少方差，第二行为解释的方差占方差总和的比例，第三行为累计解释的方差，取前38个主成分累计解释方差超过80%
+label_pca1$loadings #每个变量的负载，只保留最重要的那些
+label_pca$scores[1:10, 1:8]  #各样本在不同主成分上的负载，用于回归
+plot(label_pca, type = "lines", main = "Screeplot")
+```
+
+#标签主成分：方法2
+```{r, fig.height=8, fig.width=15}
+game_df_full %>% 
+  select(DC:`足球`) %>% 
+  prcomp() -> label_pca2
+summary(label_pca2) #第一行标准差平方为解释了多少方差，第二行为解释的方差占方差总和的比例，第三行为累计解释的方差，取前38个主成分累计解释方差超过80%
+label_pca2$sdev %>% head()
+label_pca2$rotation %>% head()
+label_pca2$x[1:10, 1:8] #各样本在不同主成分上的负载，用于回归，等同于princomp的score
+plot(label_pca2, type = "lines", main = "Screeplot")
+```
+
+```{r}
+
 ```
 

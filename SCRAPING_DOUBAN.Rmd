@@ -1,0 +1,49 @@
+---
+title: "SCRAPING_DOUBAN"
+output: html_document
+---
+
+```{r}
+library(rvest)
+library(tidyverse)
+library(lubridate)
+```
+
+```{r}
+douban <- read_html("https://guangzhou.douban.com/events/future-all?start=0")
+douban %>% html_nodes("li div a span") %>% html_text()                           #标题
+douban %>% html_nodes("li div ul li") %>% html_text(trim = TRUE) -> temp_list    #临时列表
+temp_list[seq(1, length(temp_list), 4)] %>% str_replace_all("[时间：|\\s]", "")  #时间
+temp_list[seq(2, length(temp_list), 4)] %>% str_replace_all("[地点：|\\s]", "")  #地点
+temp_list[seq(3, length(temp_list), 4)] %>% str_replace_all("[费用：|\\s]", "")  #费用
+temp_list[seq(4, length(temp_list), 4)] %>% str_replace_all("[发起：|\\s]", "")  #发起
+douban %>% html_nodes(".counts") %>% html_text(trim = TRUE)                      #参加及感兴趣
+```
+
+```{r}
+douban_df <- tibble()    #生成初始数据框
+
+for (i in seq(0, 1230, by = 10)){
+  
+  url <- paste0("https://guangzhou.douban.com/events/future-all?start=", i)
+  douban <- read_html(url)
+  
+  douban %>% html_nodes("li div a span") %>% html_text() -> title_data                              #标题
+  douban %>% html_nodes("li div ul li") %>% html_text(trim = TRUE) -> temp_list                     #临时列表
+  temp_list[seq(1, length(temp_list), 4)] %>% str_replace_all("[时间：|\\s]", "") -> time_data      #时间
+  temp_list[seq(2, length(temp_list), 4)] %>% str_replace_all("[地点：|\\s]", "") -> location_data  #地点
+  temp_list[seq(3, length(temp_list), 4)] %>% str_replace_all("[费用：|\\s]", "") -> fee_data       #费用
+  temp_list[seq(4, length(temp_list), 4)] %>% str_replace_all("[发起：|\\s]", "") -> organ_data     #发起
+  douban %>% html_nodes(".counts") %>% html_text(trim = TRUE) -> par_in_data                        #参加及感兴趣
+  
+  douban_df_i <- tibble(title = title_data, 
+                        time = time_data,
+                        location = location_data,
+                        fee = fee_data,
+                        organ = organ_data,
+                        par_in = par_in_data)
+  douban_df <- bind_rows(douban_df, douban_df_i)
+}
+douban_df
+```
+
