@@ -122,7 +122,7 @@ game_df_full
 ```
 
 #描述分析
-```{r}
+```{r, fig.height=8, fig.width=15}
 #标签出现数量
 game_df_full %>% 
   select(-c(name, type, lang, score, date, size_mb)) %>% 
@@ -165,30 +165,31 @@ game_df_full %>%
   scale_x_continuous(breaks = seq(1, 20, 1))
 ```
 
-#标签主成分：方法1
-```{r, fig.height=8, fig.width=15}
-game_df_full %>% 
-  select(DC:`足球`) %>% 
-  princomp() -> label_pca1
-summary(label_pca1) #第一行标准差平方为解释了多少方差，第二行为解释的方差占方差总和的比例，第三行为累计解释的方差，取前38个主成分累计解释方差超过80%
-label_pca1$loadings #每个变量的负载，只保留最重要的那些
-label_pca$scores[1:10, 1:8]  #各样本在不同主成分上的负载，用于回归
-plot(label_pca, type = "lines", main = "Screeplot")
-```
-
-#标签主成分：方法2
+#标签主成分
 ```{r, fig.height=8, fig.width=15}
 game_df_full %>% 
   select(DC:`足球`) %>% 
   prcomp() -> label_pca2
-summary(label_pca2) #第一行标准差平方为解释了多少方差，第二行为解释的方差占方差总和的比例，第三行为累计解释的方差，取前38个主成分累计解释方差超过80%
+summary(label_pca2) #第一行标准差平方为解释了多少方差，第二行为解释的方差占方差总和的比例，第三行为累计解释的方差
 label_pca2$sdev %>% head()
 label_pca2$rotation %>% head()
 label_pca2$x[1:10, 1:8] #各样本在不同主成分上的负载，用于回归，等同于princomp的score
 plot(label_pca2, type = "lines", main = "Screeplot")
+pca_df <- tibble(sdev = label_pca2$sdev, 
+                 var = label_pca2$sdev ^ 2,
+                 var_prop = var / sum(var),
+                 var_prop_cum = cumsum(var_prop)
+                 ) %>% mutate(n = row_number())
+pca_df %>% 
+  ggplot(aes(n, var_prop_cum)) +
+  geom_line() +
+  geom_point() +
+  scale_x_continuous(breaks = seq(1, 140, 5)) +
+  scale_y_continuous(breaks = seq(0, 1, 0.1)) +
+  theme(axis.text = element_text(size = 10),
+        panel.grid.minor = element_blank()) + 
+  labs(x = "主成分数", y = "累计解释方差") +
+  ggtitle("Screeplot of Cumulative Variance")
 ```
 
-```{r}
-
-```
 
