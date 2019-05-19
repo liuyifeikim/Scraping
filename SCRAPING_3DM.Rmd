@@ -8,11 +8,16 @@ output: html_document
 2、将标签做主成分分析
 3、将标签做因子分析
 4、回归分析预测评分
+5、游戏名相似度研究
 
 ```{r}
 library(rvest)
 library(tidyverse)
 library(lubridate)
+library(caret)
+library(stringdist)
+library(cluster)
+library(microbenchmark)
 ```
 
 #单页爬取测试
@@ -122,7 +127,7 @@ game_df_full
 ```
 
 #描述分析
-```{r, fig.height=8, fig.width=15}
+```{r, fig.height=5, fig.width=15}
 #标签出现数量
 game_df_full %>% 
   select(-c(name, type, lang, score, date, size_mb)) %>% 
@@ -155,7 +160,8 @@ game_df_full %>%
 #年份与评分
 game_df_full %>% 
   mutate(year = year(date),
-         time = 2020 - year) %>% 
+         time = 2020 - year) -> game_df_full
+game_df_full %>% 
   group_by(time) %>% 
   summarise(mean_score = mean(score)) %>% 
   arrange(time) %>% 
@@ -166,7 +172,7 @@ game_df_full %>%
 ```
 
 #标签主成分
-```{r, fig.height=8, fig.width=15}
+```{r, fig.height=5, fig.width=15}
 game_df_full %>% 
   select(DC:`足球`) %>% 
   prcomp() -> label_pca2
@@ -184,7 +190,7 @@ pca_df %>%
   ggplot(aes(n, var_prop_cum)) +
   geom_line() +
   geom_point() +
-  scale_x_continuous(breaks = seq(1, 140, 5)) +
+  scale_x_continuous(breaks = seq(0, 140, 5)) +
   scale_y_continuous(breaks = seq(0, 1, 0.1)) +
   theme(axis.text = element_text(size = 10),
         panel.grid.minor = element_blank()) + 
@@ -192,4 +198,108 @@ pca_df %>%
   ggtitle("Screeplot of Cumulative Variance")
 ```
 
+#评分预测
+```{r}
+#将主成分结果加入
+label_pca2$x %>% as.tibble() -> label_pca_tib
+game_df_full %>% 
+  select(score, type, lang, time, size_mb) %>% 
+  bind_cols(label_pca_tib[1:38]) -> game_df_model    #保留38个主成分
+game_df_model
+
+#字符转化为因子
+game_df_model %>% 
+  mutate(type_fac = as.factor(type),
+         lang_fac = as.factor(lang)) %>% 
+  select(score, time, size_mb, type_fac, lang_fac, everything(),-type, -lang, ) -> game_df_model_fac
+game_df_model_fac
+sapply(game_df_model_fac, class)
+```
+
+#模型训练
+```{r}
+#基本回归
+lm_model <- lm(score ~ ., data = game_df_model_fac)
+summary(lm_model)
+```
+
+```{r}
+#caret包:结果和lm基本一样
+lm_model_train <- train(score ~ .,
+                        data = game_df_model_fac,
+                        method = "lm",
+                        trControl = trainControl(method = "cv", number = 5)
+                        )
+lm_model_train
+summary(lm_model_train)
+```
+
+```{r}
+#R Clent优化回归
+formula <- score ~ time + size_mb + type_fac + lang_fac + PC1 + PC2 +PC3 +PC4 + PC5 + PC6 + PC7 + PC8 +
+  PC9 + PC10 + PC11 + PC12 + PC13 + PC14 + PC15 + PC16 + PC17 + PC18 + PC19 + PC20 + PC21 + PC22 + PC23 + 
+  PC24 +PC25 + PC26 + PC27 + PC28 + PC29 + PC30 + PC31 + PC32 + PC33 + PC34 + PC35 + PC36 + PC37 + PC38
+rx_lm_model <- rxLinMod(formula, data = game_df_model_fac)
+summary(rx_lm_model)
+```
+
+```{r}
+microbenchmark(lm(score ~ ., data = game_df_model_fac),
+               rxLinMod(formula, data = game_df_model_fac),
+               train(score ~ .,
+                        data = game_df_model_fac,
+                        method = "lm",
+                        trControl = trainControl(method = "cv", number = 5)
+                        ),
+               unit = "ms")
+```
+
+
+```{r}
+#计算样本两两之间的距离，包括类别变量及数值变量
+game_dist <- game_df_model[, c("type", "lang", "size_mb", "time")]
+game_dist$type <- as.factor(game_dist$type)
+game_dist$lang <- as.factor(game_dist$lang)
+game_dist_daisy <- daisy(game_dist, metric = "gower")
+game_dist_daisy %>% head()
+str(game_dist_daisy)
+```
+
+
+
+
+#相似度研究
+
+1、expand.grid 和 combn 哪个快
+2、优化为topn
+```{r}
+game_df %>% 
+  select(name) %>% 
+  mutate(name1 = str_replace_all(name, "[《|》|安装|版|免|英文|中文|简体|游戏库|硬盘|：|\\s]", ""),
+         name2 = name1) %>% 
+  select(-name) -> game_name
+game_name
+# game_name_com <- expand.grid(game_name$name1, game_name$name2, stringsAsFactors = FALSE)
+game_name_com %>% as.tibble() %>% rename(name1 = Var1, name2 = Var2) -> game_name_com
+game_name_com
+game_name_com %>%
+  mutate(lv_dist = stringdist(name1, name2, method = "lv")) %>% 
+  group_by(name1) %>% 
+  summarise(match_dist = lv_dist[which.min(lv_dist)],
+            match_name = name2[which.min(lv_dist)]) -> game_name_match
+game_name_match
+```
+
+```{r}
+game_name %>% top_n(1000) -> game_name_1000
+game_name_1000
+game_name_com_1000 <- expand.grid(game_name_1000$name1, game_name_1000$name2, stringsAsFactors = FALSE)
+game_name_com_1000 %>% as.tibble() %>% rename(name1 = Var1, name2 = Var2) -> game_name_com_1000
+game_name_com_1000 %>%
+  mutate(lv_dist = stringdist(name1, name2, method = "lv")) %>% 
+  group_by(name1) %>% 
+  summarise(match_dist = lv_dist[which.min(lv_dist)],
+            match_name = name2[which.min(lv_dist)]) -> game_name_match_1000
+game_name_match_1000
+```
 
