@@ -23,14 +23,15 @@ library(microbenchmark)
 #单页爬取测试
 ```{r}
 game <- read_html("https://dl.3dmgame.com/")
-game %>% html_nodes("ul li .bt") %>% html_text(trim = TRUE) -> name_data  #游戏名,可输入节点名或属性名
+
+game %>% html_nodes(".bt a") %>% html_text(trim = TRUE) -> name_data  #游戏名,可输入节点名或属性名
 game %>% html_nodes("ul li ol li i") %>% html_text(trim = TRUE) -> game_content #内容列表
 game_content  #每6条信息循环一次
 game_content[seq(1, length(game_content), 6)] -> type_data                          #类型
 game_content[seq(2, length(game_content), 6)] %>% as.numeric() -> hot_data          #热度
 game_content[seq(3, length(game_content), 6)] -> lang_data                          #语言 
 game_content[seq(4, length(game_content), 6)] %>% as.numeric() -> score_data        #评分
-game_content[seq(5, length(game_content), 6)] -> date_data                          #发布时间
+game_content[seq(5, length(game_content), 6)]                                       #发布时间
 game_content[seq(6, length(game_content), 6)] -> platform_data                      #平台
 game_df_test <- tibble(name = name_data, 
                        type = type_data,
@@ -43,6 +44,28 @@ game %>% html_nodes("ul li .a_click") %>% html_text(trim = TRUE) %>% str_extract
 game %>% html_nodes("li .li2") %>% html_text(trim = TRUE) %>% str_replace_all("[标签：|\n]", "") %>% str_trim(side = "both") %>% str_replace_all("\\s+", ",")  #标签
 game %>% html_nodes("div .listwrap a img") %>% html_attr("src") #图片链接
 game %>% html_nodes("div .bt a") %>% html_attr("href")          #内容链接
+
+#用selector Gadget定位
+game %>% html_nodes(".bt a") %>% html_text(trim = TRUE)                             #游戏名
+game %>% html_nodes(".li1 i") %>% html_text(trim = TRUE)                            #热度
+game %>% html_nodes(".text li:nth-child(1) i") %>% html_text(trim = TRUE)           #类型
+game %>% html_nodes(".li1+ li i") %>% html_text(trim = TRUE)                        #语言
+game %>% html_nodes(".text li:nth-child(4) i") %>% html_text(trim = TRUE)           #评分
+game %>% html_nodes(".text li:nth-child(5) i") %>% html_text(trim = TRUE)           #发布时间
+game %>% html_nodes(".text li:nth-child(6) i") %>% html_text(trim = TRUE)           #平台
+game %>% html_nodes(".bt a") %>% html_attr("href")                                  #内容链接
+game %>% html_nodes(".item img") %>% html_attr("src")                               #图片链接
+game %>% 
+  html_nodes(".a_click") %>% 
+  html_text(trim = TRUE) %>% 
+  str_extract("\\(.+\\)") %>%     
+  str_replace_all("[\\(\\)]", "")                                                   #游戏大小
+game %>% 
+  html_nodes(".li2") %>% 
+  html_text(trim = TRUE) %>% 
+  str_replace_all("[标签：|\n]", "") %>% 
+  str_trim(side = "both") %>% 
+  str_replace_all("\\s+", ",")                                                      #标签
 ```
 
 #全网爬取
@@ -56,27 +79,26 @@ for (i in 1:1843){
   url <- paste0(url_1, i, url_2)
   game <- read_html(url)
   
-  game %>% html_nodes("ul li .bt") %>% html_text(trim = TRUE) -> name_data            #游戏名,可输入节点名或属性名
-  game %>% html_nodes("ul li ol li i") %>% html_text(trim = TRUE) -> game_content     #临时内容列表
-  game_content[seq(1, length(game_content), 6)] -> type_data                          #类型
-  game_content[seq(2, length(game_content), 6)] %>% as.numeric() -> hot_data          #热度
-  game_content[seq(3, length(game_content), 6)] -> lang_data                          #语言 
-  game_content[seq(4, length(game_content), 6)] %>% as.numeric() -> score_data        #评分
-  game_content[seq(5, length(game_content), 6)] %>% as.Date() -> date_data            #发布时间
-  game_content[seq(6, length(game_content), 6)] -> platform_data                      #平台
+  game %>% html_nodes(".bt a") %>% html_text(trim = TRUE) -> name_data                                   #游戏名
+  game %>% html_nodes(".text li:nth-child(1) i") %>% html_text(trim = TRUE) -> type_data                 #类型
+  game %>% html_nodes(".li1 i") %>% html_text(trim = TRUE) %>% as.numeric() -> hot_data                  #热度
+  game %>% html_nodes(".li1+ li i") %>% html_text(trim = TRUE) -> lang_data                              #语言 
+  game %>% html_nodes(".text li:nth-child(4) i") %>% html_text(trim = TRUE) -> score_data                #评分
+  game %>% html_nodes(".text li:nth-child(5) i") %>% html_text(trim = TRUE) %>% as.Date() -> date_data   #发布时间
+  game %>% html_nodes(".text li:nth-child(6) i") %>% html_text(trim = TRUE) -> platform_data             #平台
+  game %>% html_nodes("div .listwrap a img") %>% html_attr("src") -> img_link_data                       #图片链接
+  game %>% html_nodes("div .bt a") %>% html_attr("href") -> content_link_data                            #内容链接
   game %>% 
-    html_nodes("ul li .a_click") %>% 
+    html_nodes(".a_click") %>% 
     html_text(trim = TRUE) %>% 
     str_extract("\\(.+\\)") %>%     
-    str_replace_all("[\\(\\)]", "") -> size_data  #游戏大小
+    str_replace_all("[\\(\\)]", "") -> size_data   #游戏大小
   game %>% 
-    html_nodes("li .li2") %>% 
+    html_nodes(".li2") %>% 
     html_text(trim = TRUE) %>% 
     str_replace_all("[标签：|\n]", "") %>% 
     str_trim(side = "both") %>% 
-    str_replace_all("\\s+", ",") -> label_data  #标签
-  game %>% html_nodes("div .listwrap a img") %>% html_attr("src") -> img_link_data   #图片链接
-  game %>% html_nodes("div .bt a") %>% html_attr("href") -> content_link_data        #内容链接
+    str_replace_all("\\s+", ",") -> label_data     #标签
   
   game_df_i <- tibble(name = name_data, 
                       type = type_data,
