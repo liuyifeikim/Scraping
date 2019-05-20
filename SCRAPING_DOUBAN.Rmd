@@ -12,16 +12,23 @@ library(lubridate)
 #单页爬取测试
 ```{r}
 douban <- read_html("https://guangzhou.douban.com/events/future-all?start=0")
-douban %>% html_nodes("li div a span") %>% html_text()                                  #标题
+douban %>% html_nodes(".title span") %>% html_text(trim = TRUE)                                                        #标题
+# douban %>% html_nodes(".event-cate-tag") %>% html_text(trim = TRUE) %>% str_replace_all("\n", "") %>% str_replace_all("\\s+", ",")     #标签
+douban %>% html_nodes(".event-time") %>% html_text(trim = TRUE) %>% str_replace_all("[时间：|\\s]", "")                 #时间
+douban %>% html_nodes(".event-time+ li") %>% html_text(trim = TRUE) %>% str_replace_all("[地点：|\\s]", "")             #地点
+douban %>% html_nodes("strong") %>% html_text(trim = TRUE)                                                              #费用
+douban %>% html_nodes(".event-meta a") %>% html_text(trim = TRUE)                                                       #发起
+douban %>% html_nodes(".counts span:nth-child(1)") %>% html_text(trim = TRUE) %>% str_replace_all("人参加", "") %>% as.numeric()   #参加
+douban %>% html_nodes(".pipe+ span") %>% html_text(trim = TRUE) %>% str_replace_all("人感兴趣", "") %>% as.numeric()    #感兴趣
+douban %>% html_nodes("#db-events-list img") %>% html_attr("data-lazy")                                                 #图片链接
+douban %>% html_nodes(".pic a") %>% html_attr("href")                                                                   #内容链接
+
+
 douban %>% html_nodes("li div ul li") %>% html_text(trim = TRUE) -> temp_list           #临时列表
 temp_list[seq(1, length(temp_list), 4)] %>% str_replace_all("[时间：|\\s]", "")         #时间
 temp_list[seq(2, length(temp_list), 4)] %>% str_replace_all("[地点：|\\s]", "")         #地点
 temp_list[seq(3, length(temp_list), 4)] %>% str_replace_all("[费用：|\\s]", "")         #费用
 temp_list[seq(4, length(temp_list), 4)] %>% str_replace_all("[发起：|\\s]", "")         #发起
-douban %>% html_nodes(".counts") %>% html_text(trim = TRUE)                             #参加及感兴趣
-douban %>% html_nodes("#db-events-list ul li div .title a") %>% html_attr("href")       #链接
-douban %>% html_nodes("#db-events-list ul li .pic img") %>% html_attr("data-lazy")      #图片链接
-
 ```
 
 #全网爬取测试
@@ -33,25 +40,67 @@ for (i in seq(0, 1230, by = 10)){
   url <- paste0("https://guangzhou.douban.com/events/future-all?start=", i)
   douban <- read_html(url)
   
-  douban %>% html_nodes("li div a span") %>% html_text() -> title_data                                 #标题
-  douban %>% html_nodes("li div ul li") %>% html_text(trim = TRUE) -> temp_list                        #临时列表
-  temp_list[seq(1, length(temp_list), 4)] %>% str_replace_all("[时间：|\\s]", "") -> time_data         #时间
-  temp_list[seq(2, length(temp_list), 4)] %>% str_replace_all("[地点：|\\s]", "") -> location_data     #地点
-  temp_list[seq(3, length(temp_list), 4)] %>% str_replace_all("[费用：|\\s]", "") -> fee_data          #费用
-  temp_list[seq(4, length(temp_list), 4)] %>% str_replace_all("[发起：|\\s]", "") -> organ_data        #发起
-  douban %>% html_nodes(".counts") %>% html_text(trim = TRUE) -> par_in_data                           #参加及感兴趣
-  douban %>% html_nodes("#db-events-list ul li div .title a") %>% html_attr("href") -> link_data       #链接
-  douban %>% html_nodes("#db-events-list ul li .pic img") %>% html_attr("data-lazy") -> img_link_data  #图片链接
+  douban %>% 
+    html_nodes(".title span") %>% 
+    html_text(trim = TRUE) -> title_data          #标题
+  
+  # douban %>% 
+  #   html_nodes(".event-cate-tag") %>% 
+  #   html_text(trim = TRUE) %>% 
+  #   str_replace_all("\n", "") %>% 
+  #   str_replace_all("\\s+", ",") -> label_data    #标签  
+  
+  douban %>% 
+    html_nodes(".event-time") %>% 
+    html_text(trim = TRUE) %>% 
+    str_replace_all("[时间：|\\s]", "") -> time_data         #时间
+  
+  douban %>% 
+    html_nodes(".event-time+ li") %>% 
+    html_text(trim = TRUE) %>% 
+    str_replace_all("[地点：|\\s]", "") -> location_data     #地点
+  
+  douban %>% 
+    html_nodes("strong") %>% 
+    html_text(trim = TRUE) -> fee_data          #费用
+  
+  douban %>% 
+    html_nodes(".event-meta a") %>% 
+    html_text(trim = TRUE) -> organ_data        #发起
+  
+  douban %>% 
+    html_nodes(".counts span:nth-child(1)") %>% 
+    html_text(trim = TRUE) %>% 
+    str_replace_all("人参加", "") %>% 
+    as.numeric() -> par_data          #参加人数
+  
+  douban %>% 
+    html_nodes(".pipe+ span") %>% 
+    html_text(trim = TRUE) %>% 
+    str_replace_all("人感兴趣", "") %>% 
+    as.numeric() -> int_data                  #感兴趣
+  
+  douban %>% 
+    html_nodes(".pic a") %>% 
+    html_attr("href") -> link_data            #内容链接
+  
+  douban %>% 
+    html_nodes("#db-events-list img") %>% 
+    html_attr("data-lazy") -> img_link_data       #图片链接
 
-  douban_df_i <- tibble(title = title_data, 
+  douban_df_i <- tibble(title = title_data,
                         time = time_data,
                         location = location_data,
                         fee = fee_data,
                         organ = organ_data,
-                        par_in = par_in_data,
+                        par = par_data,
+                        int = int_data,
                         link = link_data,
                         img_link = img_link_data)
   douban_df <- bind_rows(douban_df, douban_df_i)
+  
+  print(paste0("已完成", i, "条"))
+  
 }
 douban_df
 ```
