@@ -1,0 +1,104 @@
+---
+title: "guangyi"
+output: html_document
+---
+
+```{r}
+library(rvest)
+library(tidyverse)
+library(lubridate)
+```
+
+#单页爬取测试
+```{r}
+web <- read_html("https://www.gyufc.org/Home/Project/index.html?page=1")
+web %>% html_nodes(".content h3") %>% html_text(trim = TRUE)                               #标题
+web %>% html_nodes(".org") %>% html_text(trim = TRUE) %>% str_replace_all("执行方：", "")  #执行方
+web %>% html_nodes(".date") %>% html_text(trim = TRUE) %>% str_replace_all("结束", "") %>% str_trim() %>% as.Date()  #结束时间
+web %>% html_nodes(".progress .number") %>% html_text(trim = TRUE) %>% str_replace_all("%", "") %>% as.numeric()     #已筹比例
+web %>% html_nodes(".target") %>% html_text(trim = TRUE) %>% str_extract("目标：\\d+") %>% str_replace_all("目标：", "") %>% as.numeric() #目标
+web %>% html_nodes(".target .font-bold") %>% html_text(trim = TRUE) %>% as.numeric()    #已筹金额
+web %>% html_nodes(".stat .font-bold") %>% html_text(trim = TRUE) %>% as.numeric()      #支持人数
+web %>% html_nodes(".item .img img") %>% html_attr("src")    #图片链接
+web %>% html_nodes(".list .item a") %>% html_attr("href")    #项目链接
+Sys.time() %>% as.Date() #抓取日期
+```
+
+#全网采集
+```{r}
+gy_df <- tibble()
+
+for (i in 1:41){
+  
+  url <- paste0("https://www.gyufc.org/Home/Project/index.html?page=", i)
+  web <- read_html(url)
+  
+  web %>% 
+    html_nodes(".content h3") %>% 
+    html_text(trim = TRUE) -> title_data                              #标题
+  
+  web %>% 
+    html_nodes(".org") %>% 
+    html_text(trim = TRUE) %>% 
+    str_replace_all("执行方：", "") -> organ_data                     #执行方
+  
+  web %>% 
+    html_nodes(".date") %>% 
+    html_text(trim = TRUE) %>% 
+    str_replace_all("结束", "") %>% 
+    str_trim() %>% 
+    as.Date() -> end_time_data                                         #结束时间
+  
+  web %>% 
+    html_nodes(".progress .number") %>% 
+    html_text(trim = TRUE) %>% 
+    str_replace_all("%", "") %>% 
+    as.numeric() -> prop_data                                         #已筹比例
+  
+  web %>% 
+    html_nodes(".target") %>% 
+    html_text(trim = TRUE) %>% 
+    str_extract("目标：\\d+") %>% 
+    str_replace_all("目标：", "") %>% 
+    as.numeric() -> target_data                                       #目标
+  
+  web %>% 
+    html_nodes(".target .font-bold") %>% 
+    html_text(trim = TRUE) %>% 
+    as.numeric() -> money_data                                         #已筹金额
+  
+  web %>% 
+    html_nodes(".stat .font-bold") %>% 
+    html_text(trim = TRUE) %>% 
+    as.numeric() -> support_data                                      #支持人数
+  
+  web %>% 
+    html_nodes(".item .img img") %>% 
+    html_attr("src") -> img_link_data                                 #图片链接
+  
+  web %>% 
+    html_nodes(".list .item a") %>% 
+    html_attr("href") -> link_data                                    #项目链接
+  
+  Sys.time() %>% as.Date() -> scr_time_data                           #抓取日期
+  
+  gy_df_i <- tibble(title = title_data,
+                        organ = organ_data,
+                        end_time = end_time_data,
+                        prop = prop_data,
+                        target = target_data,
+                        money = money_data,
+                        support = support_data,
+                        link = link_data,
+                        img_link = img_link_data,
+                        scr_time = scr_time_data)
+  
+  gy_df <- bind_rows(gy_df, gy_df_i)
+  
+  print(paste0("已完成", i, "页"))
+
+}
+
+gy_df
+```
+
