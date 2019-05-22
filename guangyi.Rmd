@@ -12,7 +12,7 @@ library(lubridate)
 #单页爬取测试
 ```{r}
 web <- read_html("https://www.gyufc.org/Home/Project/index.html?page=1")
-web %>% html_nodes(".content h3") %>% html_text(trim = TRUE)                               #标题
+web %>% html_nodes(".content h3") %>% html_text(trim = TRUE) %>% str_replace_all("(慈善募捐)|(广益联募)|\\|", "")   #标题
 web %>% html_nodes(".org") %>% html_text(trim = TRUE) %>% str_replace_all("执行方：", "")  #执行方
 web %>% html_nodes(".date") %>% html_text(trim = TRUE) %>% str_replace_all("结束", "") %>% str_trim() %>% as.Date()  #结束时间
 web %>% html_nodes(".progress .number") %>% html_text(trim = TRUE) %>% str_replace_all("%", "") %>% as.numeric()     #已筹比例
@@ -35,7 +35,8 @@ for (i in 1:41){
   
   web %>% 
     html_nodes(".content h3") %>% 
-    html_text(trim = TRUE) -> title_data                              #标题
+    html_text(trim = TRUE)%>% 
+    str_replace_all("(慈善募捐)|(广益联募)|\\|", "") -> title_data    #标题
   
   web %>% 
     html_nodes(".org") %>% 
@@ -46,31 +47,26 @@ for (i in 1:41){
     html_nodes(".date") %>% 
     html_text(trim = TRUE) %>% 
     str_replace_all("结束", "") %>% 
-    str_trim() %>% 
-    as.Date() -> end_time_data                                         #结束时间
+    str_trim() -> end_time_data                                         #结束时间
   
   web %>% 
     html_nodes(".progress .number") %>% 
     html_text(trim = TRUE) %>% 
-    str_replace_all("%", "") %>% 
-    as.numeric() -> prop_data                                         #已筹比例
+    str_replace_all("%", "") -> prop_data                                         #已筹比例
   
   web %>% 
     html_nodes(".target") %>% 
     html_text(trim = TRUE) %>% 
     str_extract("目标：\\d+") %>% 
-    str_replace_all("目标：", "") %>% 
-    as.numeric() -> target_data                                       #目标
+    str_replace_all("目标：", "") -> target_data                                       #目标
   
   web %>% 
     html_nodes(".target .font-bold") %>% 
-    html_text(trim = TRUE) %>% 
-    as.numeric() -> money_data                                         #已筹金额
+    html_text(trim = TRUE) -> money_data                                         #已筹金额
   
   web %>% 
     html_nodes(".stat .font-bold") %>% 
-    html_text(trim = TRUE) %>% 
-    as.numeric() -> support_data                                      #支持人数
+    html_text(trim = TRUE) -> support_data                                      #支持人数
   
   web %>% 
     html_nodes(".item .img img") %>% 
@@ -83,15 +79,15 @@ for (i in 1:41){
   Sys.time() %>% as.Date() -> scr_time_data                           #抓取日期
   
   gy_df_i <- tibble(title = title_data,
-                        organ = organ_data,
-                        end_time = end_time_data,
-                        prop = prop_data,
-                        target = target_data,
-                        money = money_data,
-                        support = support_data,
-                        link = link_data,
-                        img_link = img_link_data,
-                        scr_time = scr_time_data)
+                    organ = organ_data,
+                    end_time = end_time_data,
+                    prop = prop_data,
+                    target = target_data,
+                    money = money_data,
+                    support = support_data,
+                    link = link_data,
+                    img_link = img_link_data,
+                    scr_time = scr_time_data)
   
   gy_df <- bind_rows(gy_df, gy_df_i)
   
@@ -100,5 +96,7 @@ for (i in 1:41){
 }
 
 gy_df
+
+# write.csv(gy_df, file = "广益联募项目.csv")
 ```
 
