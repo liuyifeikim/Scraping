@@ -1,0 +1,37 @@
+---
+title: "station scraping"
+output: html_document
+---
+
+```{r}
+library(lubridate)
+library(stringr)
+library(tidyverse)
+library(rvest)
+library(foreach)
+library(doParallel)
+library(microbenchmark)
+library(pryr)
+library(parallel)
+```
+
+```{r 单页面测试：内文url}
+main_url <- "http://www.checi.cn/keyunzhan/"
+main_page <- read_html(main_url)
+station_url <- main_page %>% html_nodes(".world_continents a") %>% html_attr("href")
+station_url_clear <- station_url %>% str_remove_all("/keyunzhan/\\d*/") #剔除区县客运站的url
+station_url_clear <- station_url_clear[station_url_clear != ""]
+station_url_clear
+```
+
+
+```{r 单页面测试：内容抓取}
+#提取内文url
+path = "http://www.checi.cn/keyunzhan/"
+city = "beijing"
+out_url <- paste0(path,city)
+page <- read_html(out_url)
+page %>% html_nodes(".fivecontinents a") %>% html_text(trim = TRUE) #车站名
+page %>% html_nodes(".phone") %>% html_text(trim = TRUE)            #电话
+```
+
