@@ -1,0 +1,90 @@
+---
+title: "tuba"
+output: html_document
+---
+
+```{r}
+library(foreach)
+library(doParallel)
+library(parallel)
+library(tidyverse)
+library(rvest)
+library(microbenchmark)
+library(tidytext)
+library(tictoc)
+```
+
+```{r 所有类别的主url}
+main_url <- "https://dianhua.mapbar.com/guangzhou/"
+main_page <- read_html(main_url)
+main_page %>% html_nodes(".tags a") %>% html_attr("href") -> tag_url_list
+length(tag_url_list)
+tag_url_list[1:10]
+```
+
+```{r 各类别分页列表抓取}
+tag_page <- read_html("https://dianhua.mapbar.com/guangzhou/3B0/")
+tag_page %>% html_nodes(".page a") %>% html_attr("href") -> tag_page_list
+tag_page_list <- tag_page_list[-1]
+tag_page_list
+```
+
+```{r 各类别分页列表抓取函数}
+get_tag_page_list <- function(url){
+  tag_page <- read_html(url)
+  tag_page %>% html_nodes(".page a") %>% html_attr("href") -> tag_page_list
+  tag_page_list <- tag_page_list[-1]
+  return(tag_page_list)
+}
+get_tag_page_list("http://dianhua.mapbar.com/guangzhou/GA2/")
+```
+
+```{r 爬取所有分页}
+cl <- makeCluster(detectCores())
+registerDoParallel(cl)
+tag_page_list_total <- foreach(i = seq(1, length(tag_url_list)), 
+                               .combine = "c",
+                               .packages = c("rvest","tidyverse")) %dopar% get_tag_page_list(tag_url_list[i])
+stopCluster(cl)
+```
+
+```{r}
+tag_page_list_total[1:10]
+length(tag_page_list_total)
+```
+
+```{r 合并两部分列表}
+url_total <- c(tag_url_list,tag_page_list_total) %>% sort()
+url_total[1:10]
+length(url_total)
+```
+
+```{r 爬取页面内容}
+page_content <- read_html("http://dianhua.mapbar.com/guangzhou/110/")
+page_content %>% html_nodes("") -> name
+page_content %>% html_nodes("") -> telephone
+tibble(name, telephone)
+```
+
+
+```{r 爬取页面内容函数}
+get_content <- function(url){
+  page_content <- read_html(url)
+  page_content %>% html_nodes("") -> name
+  page_content %>% html_nodes("") -> telephone
+  page_content %>% html_nodes("") -> tag
+  tibble <- tibble(name, telephone, tag)
+  return(tibble)
+}
+get_content("http://dianhua.mapbar.com/guangzhou/110/")
+```
+
+```{r 循环爬取所有内容}
+cl <- makeCluster(detectCores())
+registerDoParallel(cl)
+page_content_total <- foreach(i = seq(1, length(url_total)), 
+                               .combine = "rbind",
+                               .packages = c("rvest", "tidyverse")) %dopar% get_content(url_total[i])
+stopCluster(cl)
+```
+
